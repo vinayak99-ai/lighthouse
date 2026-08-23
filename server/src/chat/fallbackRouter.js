@@ -160,7 +160,13 @@ function buildInsight(series, data, unit) {
 
 export function routeOffline(userText) {
   const text = userText.toLowerCase();
-  const route = ROUTES.find((r) => matchKeyword(text, r.keywords) || extractEntities(text, r.entityList).length > 0);
+  // Keyword matches are domain-specific and take priority. Entity names alone
+  // are ambiguous -- e.g. "Solana" and "Base" are valid entities in both
+  // chain_activity and protocol_revenue, so a phrase like "active addresses
+  // on Solana vs Base" must not fall to whichever of those two happens to
+  // sit first in ROUTES just because its entity list also contains them.
+  const route =
+    ROUTES.find((r) => matchKeyword(text, r.keywords)) || ROUTES.find((r) => extractEntities(text, r.entityList).length > 0);
 
   if (!route) {
     return {

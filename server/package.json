@@ -8,7 +8,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "seed": "node src/data/seed.js",
-    "test": "node --test src/tools/tools.test.js"
+    "test": "node --test src/tools/tools.test.js src/chat/fallbackRouter.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

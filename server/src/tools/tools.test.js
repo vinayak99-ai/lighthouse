@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { seedAll } from "../data/seed.js";
+import { getDb } from "../data/db.js";
 import { runTool, isDataTool, ToolInputError } from "./tools.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
 
@@ -50,6 +51,14 @@ test("metric switch changes which column is aggregated", () => {
 test("x402 agentic payments groups by agent network", () => {
   const result = runTool("query_x402_agentic_payments", { metric: "volume", group_by: "agent_network" });
   assert.ok(result.series.includes("AI Shopping Agents"));
+});
+
+test("issuer total sums across the hidden chain dimension, not just one chain", () => {
+  // Sanity check against raw SQL: total USDT supply on one day is the sum
+  // across every chain, not an average across the 5 chain rows.
+  const raw = getDb().prepare("SELECT SUM(supply_usd) v FROM stablecoin_supply WHERE issuer = 'USDT' AND date = '2026-08-22'").get();
+  const result = runTool("query_stablecoin_supply", { issuers: ["USDT"], group_by: "issuer", start_date: "2026-08-22", end_date: "2026-08-22" });
+  assert.equal(result.data[0].USDT, raw.v);
 });
 
 test("stock metrics are averaged, not summed, when bucketed weekly", () => {

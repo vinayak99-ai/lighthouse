@@ -64,15 +64,27 @@ export function runGroupedTimeSeries({
   });
 
   const bucket = bucketExpr(granularity);
-  const selectEntity = groupByEntity ? `${entityCol} AS entity,` : "";
-  const groupBy = groupByEntity ? `bucket, ${entityCol}` : "bucket";
+  const groupBy = groupByEntity ? `bucket, entity` : "bucket";
 
+  // Two-stage aggregation. A table can carry a dimension the caller didn't
+  // ask to split by (e.g. stablecoin_supply has both issuer and chain) --
+  // rows sharing the same (date, entity) are components of one total and
+  // must always be SUMmed first (a stablecoin's total supply is the sum of
+  // its per-chain supplies, not their average). Only *then*, across the
+  // distinct dates inside one time bucket, does the SUM-vs-AVG choice for
+  // stock vs. flow metrics apply -- summing a stock like TVL across a week
+  // of days would inflate it; averaging a flow like volume would deflate it.
   const sql = `
-    SELECT ${bucket} AS bucket, ${selectEntity} ${aggregate}(${valueCol}) AS value
-    FROM ${table}
-    ${where.length ? "WHERE " + where.join(" AND ") : ""}
+    WITH daily AS (
+      SELECT date, ${groupByEntity ? `${entityCol} AS entity,` : ""} SUM(${valueCol}) AS value
+      FROM ${table}
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
+      GROUP BY date${groupByEntity ? `, ${entityCol}` : ""}
+    )
+    SELECT ${bucket} AS bucket, ${groupByEntity ? "entity," : ""} ${aggregate}(value) AS value
+    FROM daily
     GROUP BY ${groupBy}
-    ORDER BY bucket ASC${groupByEntity ? `, ${entityCol} ASC` : ""}
+    ORDER BY bucket ASC${groupByEntity ? `, entity ASC` : ""}
   `;
 
   const rows = getDb().prepare(sql).all(params);
