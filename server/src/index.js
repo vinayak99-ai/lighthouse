@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import { ensureSchema, getDb } from "./data/db.js";
 import { seedAll } from "./data/seed.js";
-import { runConversation, hasApiKey, CHAT_MODEL } from "./chat/orchestrator.js";
+import { runConversation, hasApiKey, activeProvider, activeModel } from "./chat/orchestrator.js";
 import { routeOffline } from "./chat/fallbackRouter.js";
 import { STARTER_DOMAINS } from "./starters.js";
 
@@ -22,7 +22,12 @@ if (row.c === 0) {
 }
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, mode: hasApiKey() ? "live" : "offline-demo", model: hasApiKey() ? CHAT_MODEL : null });
+  res.json({
+    ok: true,
+    mode: hasApiKey() ? "live" : "offline-demo",
+    provider: activeProvider(),
+    model: activeModel(),
+  });
 });
 
 app.get("/api/starters", (req, res) => {

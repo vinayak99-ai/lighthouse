@@ -50,7 +50,11 @@ export default function App() {
         </div>
         {health && (
           <span
-            title={health.mode === "live" ? `Live via ${health.model}` : "No ANTHROPIC_API_KEY set — using the offline demo router"}
+            title={
+              health.mode === "live"
+                ? `Live via ${health.provider} (${health.model})`
+                : "No ANTHROPIC_API_KEY or OPENAI_API_KEY set — using the offline demo router"
+            }
             style={{
               fontSize: 12,
               color: "var(--text-muted)",
@@ -59,7 +63,7 @@ export default function App() {
               padding: "3px 10px",
             }}
           >
-            {health.mode === "live" ? `● live (${health.model})` : "● offline demo"}
+            {health.mode === "live" ? `● live · ${health.provider} (${health.model})` : "● offline demo"}
           </span>
         )}
       </header>

@@ -6,7 +6,7 @@ builds the query itself, runs it against a stubbed blockchain dataset, and
 renders the answer as a chart.
 
 ```
-User → React chat UI → POST /api/chat → Claude (tool-calling loop)
+User → React chat UI → POST /api/chat → Claude or GPT (tool-calling loop)
                                             │
                                             ├─ query_stablecoin_supply
                                             ├─ query_defi_tvl
@@ -30,14 +30,44 @@ The model never writes raw SQL. Every data tool takes structured arguments
 builds and runs the parameterized query — the same shape of contract a real
 analyst product would want between an LLM and a production database.
 
-## Why it works without an API key
+## Choosing a model provider
 
-If `ANTHROPIC_API_KEY` isn't set, `/api/chat` falls back to a deterministic
-keyword router (`server/src/chat/fallbackRouter.js`) that picks the same
-tools a model would, from the same keyword/entity cues, and renders the same
-chart contract. Point the client at a live Anthropic key and the tool-calling
-orchestrator (`server/src/chat/orchestrator.js`) takes over transparently —
-the frontend doesn't know or care which one answered.
+`server/src/chat/orchestrator.js` is a thin dispatcher over two interchangeable
+tool-calling loops that both speak the same tool/`render_chart` contract
+(`server/src/tools/tools.js`):
+
+- `server/src/chat/providers/anthropic.js` — Claude, via `@anthropic-ai/sdk`.
+  Tool results go back as `tool_result` content blocks.
+- `server/src/chat/providers/openai.js` — GPT, via the `openai` package's Chat
+  Completions API. The same `TOOL_DEFINITIONS` get reshaped into OpenAI's
+  `{ type: "function", function: {...} }` tool format in that file; tool
+  results go back as one `{ role: "tool", tool_call_id, content }` message
+  per call instead of a single content block.
+
+Selection is by environment variable — set **one** of these in `server/.env`
+(copy `server/.env.example`):
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...   # picked first if both are set
+OPENAI_API_KEY=sk-...
+```
+
+If both are set, Anthropic wins by default; force a specific one with
+`LLM_PROVIDER=openai` or `LLM_PROVIDER=anthropic`. Override the model per
+provider with `ANTHROPIC_MODEL` / `OPENAI_MODEL` (defaults: `claude-sonnet-5`,
+`gpt-4o`). `GET /api/health` reports which provider and model are active.
+
+Adding a third provider means writing one more file under
+`server/src/chat/providers/` with a `runConversation(history, apiKey)` export
+and wiring it into `resolveProvider()` — nothing in the tools, the system
+prompt, or the frontend needs to change.
+
+## Why it works without any API key
+
+If neither key is set, `/api/chat` falls back to a deterministic keyword
+router (`server/src/chat/fallbackRouter.js`) that picks the same tools a model
+would, from the same keyword/entity cues, and renders the same chart
+contract. The frontend doesn't know or care which of the three answered.
 
 ## The data
 
@@ -79,8 +109,9 @@ npm run dev:server      # http://localhost:8787
 npm run dev:client      # http://localhost:5173 (proxies /api to the server)
 ```
 
-Copy `server/.env.example` to `server/.env` and set `ANTHROPIC_API_KEY` to
-run on live Claude tool-calling instead of the offline router.
+Copy `server/.env.example` to `server/.env` and set `ANTHROPIC_API_KEY` or
+`OPENAI_API_KEY` to run on live tool-calling instead of the offline router
+(see "Choosing a model provider" above).
 
 Run the backend tests (10 data tools + the stock/flow aggregation
 regression) with:
