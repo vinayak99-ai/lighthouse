@@ -53,18 +53,23 @@ function series(entityKey, { base, driftPct, volPct, weekendDipPct = 0 }) {
   return out;
 }
 
+// Clear + insert as ONE atomic transaction. Two separate autocommit
+// statements (DELETE, then INSERT) left a window where a second, concurrent
+// seedAll() call -- e.g. a dev server's boot-time auto-seed racing a test
+// run's seedAll() against the same on-disk file -- could sneak its own
+// DELETE in between this call's DELETE and INSERT, so both inserts survived
+// and doubled the table. Wrapping both statements in one transaction makes
+// SQLite serialize concurrent callers instead of interleaving them.
 function insertRows(db, table, columns, rows) {
   const placeholders = columns.map(() => "?").join(", ");
   const stmt = db.prepare(`INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})`);
-  const insertMany = db.transaction((rows) => {
+  const replace = db.transaction((rows) => {
+    db.prepare(`DELETE FROM ${table}`).run();
     for (const row of rows) stmt.run(...columns.map((c) => row[c]));
   });
-  insertMany(rows);
+  replace(rows);
 }
 
-function clearTable(db, table) {
-  db.exec(`DELETE FROM ${table}`);
-}
 
 function seedStablecoins(db) {
   const bases = { USDT: 118000000000, USDC: 34000000000, DAI: 5300000000, FDUSD: 3200000000, PYUSD: 900000000, USDe: 5800000000 };
@@ -77,7 +82,6 @@ function seedStablecoins(db) {
       s.forEach(({ date, value }) => rows.push({ date, issuer, chain, supply_usd: Math.round(value) }));
     }
   }
-  clearTable(db, "stablecoin_supply");
   insertRows(db, "stablecoin_supply", ["date", "issuer", "chain", "supply_usd"], rows);
 }
 
@@ -92,7 +96,6 @@ function seedDefiTvl(db) {
       s.forEach(({ date, value }) => rows.push({ date, protocol, chain, tvl_usd: Math.round(value) }));
     }
   }
-  clearTable(db, "defi_tvl");
   insertRows(db, "defi_tvl", ["date", "protocol", "chain", "tvl_usd"], rows);
 }
 
@@ -113,7 +116,6 @@ function seedPerpetuals(db) {
       rows.push({ date: oiSeries[i].date, exchange, open_interest_usd: Math.round(oiSeries[i].value), volume_usd: Math.round(volSeries[i].value) });
     }
   }
-  clearTable(db, "perp_markets");
   insertRows(db, "perp_markets", ["date", "exchange", "open_interest_usd", "volume_usd"], rows);
 }
 
@@ -133,7 +135,6 @@ function seedPredictionMarkets(db) {
       s.forEach(({ date, value }) => rows.push({ date, platform, category, volume_usd: Math.round(value) }));
     }
   }
-  clearTable(db, "prediction_markets");
   insertRows(db, "prediction_markets", ["date", "platform", "category", "volume_usd"], rows);
 }
 
@@ -146,7 +147,6 @@ function seedRwa(db) {
     const s = series(`rwa:${issuer}`, { base: bases[issuer], driftPct: drift[issuer], volPct: 1.4 });
     s.forEach(({ date, value }) => rows.push({ date, asset_type: typeFor[issuer], issuer, value_usd: Math.round(value) }));
   }
-  clearTable(db, "rwa_value");
   insertRows(db, "rwa_value", ["date", "asset_type", "issuer", "value_usd"], rows);
 }
 
@@ -160,7 +160,6 @@ function seedProtocolRevenue(db) {
       rows.push({ date, protocol, chain: protocol, revenue_usd: Math.round(value * 0.62), fees_usd: Math.round(value) });
     });
   }
-  clearTable(db, "protocol_revenue");
   insertRows(db, "protocol_revenue", ["date", "protocol", "chain", "revenue_usd", "fees_usd"], rows);
 }
 
@@ -181,7 +180,6 @@ function seedChainActivity(db) {
       rows.push({ date: addrSeries[i].date, chain, active_addresses: Math.round(addrSeries[i].value), transactions: Math.round(txSeries[i].value) });
     }
   }
-  clearTable(db, "chain_activity");
   insertRows(db, "chain_activity", ["date", "chain", "active_addresses", "transactions"], rows);
 }
 
@@ -203,7 +201,6 @@ function seedStaking(db) {
       rows.push({ date, provider, staked_eth: Math.round(value), apr_pct: Math.round(apr * 100) / 100 });
     });
   }
-  clearTable(db, "staking");
   insertRows(db, "staking", ["date", "provider", "staked_eth", "apr_pct"], rows);
 }
 
@@ -218,7 +215,6 @@ function seedNftVolume(db) {
       rows.push({ date: volSeries[i].date, marketplace, volume_usd: Math.round(volSeries[i].value), sales_count: Math.round(salesSeries[i].value) });
     }
   }
-  clearTable(db, "nft_volume");
   insertRows(db, "nft_volume", ["date", "marketplace", "volume_usd", "sales_count"], rows);
 }
 
@@ -250,7 +246,6 @@ function seedX402Payments(db) {
       }
     }
   }
-  clearTable(db, "x402_payments");
   insertRows(db, "x402_payments", ["date", "facilitator", "agent_network", "volume_usd", "tx_count"], rows);
 }
 

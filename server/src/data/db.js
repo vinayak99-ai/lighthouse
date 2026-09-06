@@ -11,6 +11,10 @@ export function getDb() {
   if (_db) return _db;
   _db = new Database(DB_PATH);
   _db.pragma("journal_mode = WAL");
+  // This file is shared by multiple OS processes in dev (the server, `npm run
+  // seed`, and test runs) -- without a busy timeout, a writer that finds the
+  // file locked throws SQLITE_BUSY immediately instead of waiting its turn.
+  _db.pragma("busy_timeout = 5000");
   return _db;
 }
 

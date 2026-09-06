@@ -111,6 +111,10 @@ function matchKeyword(text, list) {
   return list.some((kw) => text.includes(kw));
 }
 
+function countKeywordMatches(text, list) {
+  return list.filter((kw) => text.includes(kw)).length;
+}
+
 function extractEntities(text, entityList) {
   return entityList.filter((e) => text.includes(e.toLowerCase()));
 }
@@ -160,13 +164,21 @@ function buildInsight(series, data, unit) {
 
 export function routeOffline(userText) {
   const text = userText.toLowerCase();
-  // Keyword matches are domain-specific and take priority. Entity names alone
-  // are ambiguous -- e.g. "Solana" and "Base" are valid entities in both
+  // Keyword matches are domain-specific and take priority over entity-name
+  // matches alone -- e.g. "Solana" and "Base" are valid entities in both
   // chain_activity and protocol_revenue, so a phrase like "active addresses
   // on Solana vs Base" must not fall to whichever of those two happens to
   // sit first in ROUTES just because its entity list also contains them.
-  const route =
-    ROUTES.find((r) => matchKeyword(text, r.keywords)) || ROUTES.find((r) => extractEntities(text, r.entityList).length > 0);
+  // Among keyword matches, the route with the MOST matching keywords wins,
+  // not just the first one found in array order -- an entity name that
+  // doubles as another domain's keyword (e.g. "Lido" is a defi_tvl keyword
+  // AND a staking entity) must not out-rank a question that's clearly about
+  // staking ("staked eth", "rocket pool") just because it comes first.
+  const keywordCounts = ROUTES.map((r) => ({ route: r, count: countKeywordMatches(text, r.keywords) })).filter(
+    (m) => m.count > 0
+  );
+  const bestKeywordMatch = keywordCounts.reduce((best, m) => (!best || m.count > best.count ? m : best), null);
+  const route = bestKeywordMatch?.route ?? ROUTES.find((r) => extractEntities(text, r.entityList).length > 0);
 
   if (!route) {
     return {
@@ -210,7 +222,19 @@ export function routeOffline(userText) {
     : "day";
 
   const result = runTool(route.tool, args);
-  const chartType = wantsShare && result.series.length > 1 ? "stacked_bar" : "line";
+  // "current supply of X" wants a KPI tile, not a trend chart -- but only
+  // when the phrasing is actually asking for a snapshot, not a history
+  // ("current trend" / "since January" still means "show me the chart").
+  const wantsStat =
+    /\b(current|latest|today|right now|what is|what's|how much is)\b/.test(text) &&
+    !/\b(trend|over time|chart|history|since|compare|vs\.?|versus)\b/.test(text);
+  const chartType = wantsShare && result.series.length > 1
+    ? "stacked_bar"
+    : wantsStat
+    ? "stat"
+    : result.series.length > 4
+    ? "small_multiples" // too many overlapping lines to read as one chart -- facet instead
+    : "line";
 
   const entityNote = entities.length > 0 ? entities.join(", ") : "all tracked entities";
   const chart = {

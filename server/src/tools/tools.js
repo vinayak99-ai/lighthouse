@@ -177,13 +177,15 @@ export const TOOL_DEFINITIONS = [
     name: "render_chart",
     description:
       "Render the final chart for the user. Call this once you have the data you need. type='line'/'area' for trend over time, " +
-      "'bar' for magnitude comparison, 'stacked_bar' for part-to-whole over time. `series` lists the entity keys in the order " +
+      "'bar' for magnitude comparison, 'stacked_bar' for part-to-whole over time, 'stat' for a single current value (a KPI, not " +
+      "a trend), 'small_multiples' for many entities' trend shapes at once. `series` lists the entity keys in the order " +
       "they should be colored (max 8, fold extras into 'Other'). `data` is an array of rows shaped " +
-      "{ x: <date or category label>, <series key>: <number>, ... }.",
+      "{ x: <date or category label>, <series key>: <number>, ... } -- the same shape for every chart_type, 'stat' and " +
+      "'small_multiples' included; they just render it differently.",
     input_schema: {
       type: "object",
       properties: {
-        chart_type: { type: "string", enum: ["line", "area", "bar", "stacked_bar"] },
+        chart_type: { type: "string", enum: ["line", "area", "bar", "stacked_bar", "stat", "small_multiples"] },
         title: { type: "string" },
         subtitle: { type: "string", description: "One short sentence of context (units, date range)." },
         y_unit: { type: "string", enum: ["usd", "count", "percent"], description: "How to format axis ticks and tooltip values." },

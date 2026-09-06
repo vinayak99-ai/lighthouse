@@ -2,8 +2,16 @@ import { useState } from "react";
 import TimeSeriesChart from "../charts/TimeSeriesChart.jsx";
 import CategoryBarChart from "../charts/CategoryBarChart.jsx";
 import StackedBarChart from "../charts/StackedBarChart.jsx";
+import StatTile from "../charts/StatTile.jsx";
+import SmallMultiples from "../charts/SmallMultiples.jsx";
 import ChartLegend from "../charts/ChartLegend.jsx";
 import { formatCompact, formatDateLabel } from "../lib/chartTheme.js";
+
+// "stat" and "small_multiples" self-label every value/facet directly (a name
+// beside each tile or above each mini-chart) -- color isn't the identity
+// channel there, so the color-matching legend those other forms need would
+// just restate what's already on screen.
+const SELF_LABELED_TYPES = new Set(["stat", "small_multiples"]);
 
 export default function ChartCard({ chart }) {
   const [showTable, setShowTable] = useState(false);
@@ -31,6 +39,7 @@ export default function ChartCard({ chart }) {
         borderRadius: "var(--radius-md)",
         padding: 20,
         marginTop: 8,
+        width: "100%",
         maxWidth: 720,
       }}
     >
@@ -57,10 +66,16 @@ export default function ChartCard({ chart }) {
         </button>
       </div>
 
-      <ChartLegend series={series} hiddenSeries={hiddenSeries} onToggle={toggleSeries} onHover={setHoveredSeries} />
+      {!SELF_LABELED_TYPES.has(chart_type) && (
+        <ChartLegend series={series} hiddenSeries={hiddenSeries} onToggle={toggleSeries} onHover={setHoveredSeries} />
+      )}
 
       {showTable ? (
         <DataTable data={data} series={series} unit={y_unit} />
+      ) : chart_type === "stat" ? (
+        <StatTile data={data} series={series} unit={y_unit} />
+      ) : chart_type === "small_multiples" ? (
+        <SmallMultiples data={data} series={series} unit={y_unit} />
       ) : chart_type === "bar" ? (
         <CategoryBarChart {...chartProps} />
       ) : chart_type === "stacked_bar" ? (
