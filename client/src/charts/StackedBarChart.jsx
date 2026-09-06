@@ -2,7 +2,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import { colorForIndex, formatCompact, formatDateLabel } from "../lib/chartTheme.js";
 import ChartTooltip from "./ChartTooltip.jsx";
 
-export default function StackedBarChart({ data, series, unit }) {
+export default function StackedBarChart({ data, series, unit, hoveredSeries, hiddenSeries }) {
   return (
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }} barCategoryGap="10%">
@@ -22,18 +22,29 @@ export default function StackedBarChart({ data, series, unit }) {
           tickLine={false}
           width={64}
         />
-        <Tooltip content={<ChartTooltip unit={unit} seriesOrder={series} />} cursor={{ fill: "var(--gridline)", opacity: 0.4 }} />
-        {series.map((key, i) => (
-          <Bar
-            key={key}
-            dataKey={key}
-            stackId="stack"
-            fill={colorForIndex(i)}
-            stroke="var(--surface-1)"
-            strokeWidth={2}
-            maxBarSize={28}
-          />
-        ))}
+        <Tooltip
+          content={<ChartTooltip unit={unit} seriesOrder={series} />}
+          cursor={{ fill: "var(--gridline)", opacity: 0.4 }}
+        />
+        {series.map((key, i) => {
+          if (hiddenSeries?.has(key)) return null;
+          const dimmed = hoveredSeries && hoveredSeries !== key;
+          return (
+            <Bar
+              key={key}
+              dataKey={key}
+              stackId="stack"
+              fill={colorForIndex(i)}
+              fillOpacity={dimmed ? 0.35 : 1}
+              stroke="var(--surface-1)"
+              strokeWidth={2}
+              maxBarSize={28}
+              animationDuration={500}
+              animationEasing="ease-out"
+              style={{ transition: "opacity 0.2s ease" }}
+            />
+          );
+        })}
       </BarChart>
     </ResponsiveContainer>
   );

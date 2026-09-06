@@ -23,6 +23,11 @@
   --radius-md: 12px;
   --radius-sm: 8px;
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --shadow-sm: 0 1px 2px rgba(11, 11, 11, 0.04), 0 1px 3px rgba(11, 11, 11, 0.06);
+  --shadow-md: 0 2px 4px rgba(11, 11, 11, 0.05), 0 8px 24px rgba(11, 11, 11, 0.1);
+  --shadow-tooltip: 0 1px 2px rgba(11, 11, 11, 0.08), 0 8px 24px rgba(11, 11, 11, 0.16);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +50,10 @@
     --series-6: #008300;
     --series-7: #9085e9;
     --series-8: #e66767;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-tooltip: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -67,6 +76,10 @@
   --series-6: #008300;
   --series-7: #9085e9;
   --series-8: #e66767;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-tooltip: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -84,4 +97,59 @@ body {
   font-family: var(--font-sans);
   background: var(--page-plane);
   color: var(--text-primary);
+}
+
+/* Chart card: soft elevation that lifts slightly on hover, like a physical card. */
+.lh-chart-card {
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+  animation: lh-card-in 0.35s var(--ease-out);
+}
+.lh-chart-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+@keyframes lh-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Small ghost buttons (the Table/Chart toggle). */
+.lh-btn {
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.lh-btn:hover {
+  background: var(--gridline);
+  border-color: var(--baseline);
+  color: var(--text-primary);
+}
+
+/* Legend items: clickable to toggle a series, hoverable to spotlight one. */
+.lh-legend-item {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font: inherit;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.lh-legend-item:hover {
+  color: var(--text-primary);
+}
+.lh-legend-item[data-hidden="true"] {
+  opacity: 0.4;
+}
+
+/* Recharts' own class names, targeted directly for a glow Recharts has no prop for. */
+.recharts-active-dot {
+  filter: drop-shadow(0 1px 4px rgba(11, 11, 11, 0.35));
+  transition: r 0.15s ease;
+}
+.recharts-wrapper .recharts-cartesian-axis-tick-value {
+  transition: fill 0.15s ease;
 }

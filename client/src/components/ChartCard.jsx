@@ -7,10 +7,24 @@ import { formatCompact, formatDateLabel } from "../lib/chartTheme.js";
 
 export default function ChartCard({ chart }) {
   const [showTable, setShowTable] = useState(false);
+  const [hoveredSeries, setHoveredSeries] = useState(null);
+  const [hiddenSeries, setHiddenSeries] = useState(() => new Set());
   const { chart_type, title, subtitle, series, data, insight, y_unit } = chart;
+
+  function toggleSeries(name) {
+    setHiddenSeries((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else if (next.size < series.length - 1) next.add(name); // never hide the last visible series
+      return next;
+    });
+  }
+
+  const chartProps = { data, series, unit: y_unit, hoveredSeries, hiddenSeries };
 
   return (
     <div
+      className="lh-chart-card"
       style={{
         background: "var(--surface-1)",
         border: "1px solid var(--border)",
@@ -26,6 +40,7 @@ export default function ChartCard({ chart }) {
           {subtitle && <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-muted)" }}>{subtitle}</p>}
         </div>
         <button
+          className="lh-btn"
           onClick={() => setShowTable((s) => !s)}
           style={{
             background: "transparent",
@@ -42,16 +57,16 @@ export default function ChartCard({ chart }) {
         </button>
       </div>
 
-      <ChartLegend series={series} />
+      <ChartLegend series={series} hiddenSeries={hiddenSeries} onToggle={toggleSeries} onHover={setHoveredSeries} />
 
       {showTable ? (
         <DataTable data={data} series={series} unit={y_unit} />
       ) : chart_type === "bar" ? (
-        <CategoryBarChart data={data} series={series} unit={y_unit} />
+        <CategoryBarChart {...chartProps} />
       ) : chart_type === "stacked_bar" ? (
-        <StackedBarChart data={data} series={series} unit={y_unit} />
+        <StackedBarChart {...chartProps} />
       ) : (
-        <TimeSeriesChart type={chart_type} data={data} series={series} unit={y_unit} />
+        <TimeSeriesChart type={chart_type} {...chartProps} />
       )}
 
       {insight && (

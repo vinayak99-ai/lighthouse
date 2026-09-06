@@ -12,7 +12,7 @@ export default function ChartTooltip({ active, payload, label, unit, seriesOrder
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-sm)",
         padding: "8px 12px",
-        boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+        boxShadow: "var(--shadow-tooltip)",
         fontSize: 13,
         minWidth: 160,
       }}
