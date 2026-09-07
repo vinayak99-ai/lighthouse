@@ -1,11 +1,11 @@
-import { getDb } from "../data/db.js";
+import { getDataSource } from "../data/dataSource.js";
 
-// Turns a granularity into the SQL expression used to bucket `date`.
-// week buckets to the Monday that starts the week; month buckets to the 1st.
+// Turns a granularity into the SQL expression used to bucket `date`. The
+// exact expression is dialect-specific (SQLite vs Snowflake date functions
+// differ), so it's delegated to whichever data source is active -- week
+// buckets to the Monday that starts the week; month buckets to the 1st.
 export function bucketExpr(granularity) {
-  if (granularity === "week") return "date(date, '-' || ((strftime('%w', date) + 6) % 7) || ' days')";
-  if (granularity === "month") return "strftime('%Y-%m-01', date)";
-  return "date";
+  return getDataSource().bucketExpr(granularity);
 }
 
 export class ToolInputError extends Error {}
@@ -22,9 +22,11 @@ function assertKnownValues(values, allowed, label) {
  * Builds and runs a parameterized, read-only SQL query grouping a value column
  * over time, optionally split by an entity dimension. This is the "backend
  * builds the query" layer: the model supplies structured, typed arguments —
- * never raw SQL — and this function is the only thing that touches the DB.
+ * never raw SQL — and this function is the only thing that touches the DB,
+ * via whichever data source is active (SQLite stub data, or a real
+ * Snowflake warehouse -- see server/src/data/dataSource.js).
  */
-export function runGroupedTimeSeries({
+export async function runGroupedTimeSeries({
   table,
   entityCol,
   entityAllowed,
@@ -63,7 +65,8 @@ export function runGroupedTimeSeries({
     }
   });
 
-  const bucket = bucketExpr(granularity);
+  const dataSource = getDataSource();
+  const bucket = dataSource.bucketExpr(granularity);
   const groupBy = groupByEntity ? `bucket, entity` : "bucket";
 
   // Two-stage aggregation. A table can carry a dimension the caller didn't
@@ -87,7 +90,7 @@ export function runGroupedTimeSeries({
     ORDER BY bucket ASC${groupByEntity ? `, entity ASC` : ""}
   `;
 
-  const rows = getDb().prepare(sql).all(params);
+  const rows = await dataSource.runQuery(sql, params);
   return { sql: sql.trim(), rows };
 }
 

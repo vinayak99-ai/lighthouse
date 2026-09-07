@@ -49,7 +49,7 @@ app.post("/api/chat", async (req, res) => {
     const text = Array.isArray(lastUser?.content)
       ? lastUser.content.map((b) => b.text || "").join(" ")
       : lastUser?.content || "";
-    const result = routeOffline(text);
+    const result = await routeOffline(text);
     return res.json({ ...result, mode: "offline-demo" });
   } catch (err) {
     console.error(err);

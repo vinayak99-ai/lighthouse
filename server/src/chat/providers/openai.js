@@ -73,7 +73,7 @@ export async function runConversation(history, apiKey, client) {
         continue;
       }
       try {
-        const result = runTool(call.function.name, args);
+        const result = await runTool(call.function.name, args);
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       } catch (err) {
         const errMessage = err instanceof ToolInputError ? err.message : `Tool failed: ${err.message}`;

@@ -7,8 +7,8 @@ const dateProps = {
   granularity: { type: "string", enum: ["day", "week", "month"], description: "Time bucket size. Use week/month for ranges longer than ~90 days to keep series readable." },
 };
 
-function timeSeriesResult({ table, entityCol, entityAllowed, entities, extraFilters, valueCol, aggregate, args, fallbackSeriesName }) {
-  const { rows } = runGroupedTimeSeries({
+async function timeSeriesResult({ table, entityCol, entityAllowed, entities, extraFilters, valueCol, aggregate, args, fallbackSeriesName }) {
+  const { rows } = await runGroupedTimeSeries({
     table,
     entityCol,
     entityAllowed,
@@ -331,7 +331,7 @@ export function isDataTool(name) {
   return name !== "render_chart" && Object.prototype.hasOwnProperty.call(HANDLERS, name);
 }
 
-export function runTool(name, args) {
+export async function runTool(name, args) {
   const handler = HANDLERS[name];
   if (!handler) throw new ToolInputError(`Unknown tool: ${name}`);
   return handler(args || {});

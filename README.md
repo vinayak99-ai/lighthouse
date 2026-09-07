@@ -117,6 +117,56 @@ one question still gets one answer, just a more reliably well-formed one.
 The offline router's own heuristics are asserted against the same validator
 as a regression guard (`fallbackRouter.test.js`).
 
+## Connecting to real Snowflake
+
+`server/src/data/dataSource.js` is the same interchangeable-adapter pattern
+as the LLM providers, one level down the stack: `queryEngine.js` builds SQL
+and calls `dataSource.runQuery(sql, params)` without knowing which backend is
+listening.
+
+- `server/src/data/adapters/sqliteAdapter.js` — the stub data, default.
+- `server/src/data/adapters/snowflakeAdapter.js` — a real Snowflake
+  warehouse, via `snowflake-sdk`.
+
+Set `SNOWFLAKE_ACCOUNT` (plus `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`,
+`SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`,
+`SNOWFLAKE_SCHEMA` — see `server/.env.example`) and the app switches
+automatically; force one explicitly with `LIGHTHOUSE_DATA_SOURCE=snowflake`
+or `=sqlite`. `queryEngine.js`'s SQL and `tools.js`'s typed-argument contract
+don't change either way — only which dialect's date-bucketing function and
+which physical connection get used.
+
+**Before pointing this at a real account**, run
+`server/src/data/snowflakeSetup.sql` once (as a sufficiently privileged
+role). It creates the four things a text-to-chart app querying a shared
+warehouse actually needs, none of which are enforced by application code
+alone:
+
+1. **A dedicated warehouse** — compute isolation, so a slow query from this
+   app can never starve any other workload sharing the account.
+2. **A resource monitor** — a hard cost ceiling (credit quota), independent
+   of anything this app does or doesn't do correctly.
+3. **`STATEMENT_TIMEOUT_IN_SECONDS = 60`** — Snowflake itself aborts any
+   query past this, server-side, even if this app's own process has crashed
+   or been killed. `snowflakeAdapter.js` also races every query against its
+   own app-level timeout (a few seconds past Snowflake's own, as a backstop)
+   and calls the statement's `.cancel()` explicitly if it fires — see
+   `executeWithTimeout` and its tests in `snowflakeAdapter.test.js`, which
+   verify the cancel-on-hang path against a mocked connection.
+4. **A read-only role** (`SELECT` grants only) — this, not the
+   `assertSelectOnly()` guard in `snowflakeAdapter.js`, is the actual safety
+   boundary. The application-level guard (single statement, must start with
+   `SELECT`/`WITH`, rejects `INSERT`/`UPDATE`/`DELETE`/`CREATE`/`DROP`/etc.)
+   is defense in depth on top of it, not a substitute — a bug in that check
+   should never be the only thing standing between a query and a write.
+
+One thing that does need manual attention: the 10 tools' SQL templates
+(`server/src/tools/tools.js`) expect table/column shapes matching the stub
+schema (see `server/src/data/db.js`'s `SCHEMA`, e.g.
+`stablecoin_supply(date, issuer, chain, supply_usd)`). Point Snowflake tables
+at the same shape, or adjust each tool's `table`/`entityCol`/`valueCol`
+arguments to your actual warehouse schema — that part isn't automatic.
+
 ## Running it
 
 ```bash

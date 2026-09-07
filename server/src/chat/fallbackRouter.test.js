@@ -8,53 +8,53 @@ test.before(() => {
   seedAll();
 });
 
-test("a domain keyword wins over an entity name shared with another domain", () => {
+test("a domain keyword wins over an entity name shared with another domain", async () => {
   // "Solana" and "Base" are valid entities in both chain_activity and
   // protocol_revenue -- the "active addresses" keyword must decide this,
   // not entity-list order.
-  const { chart } = routeOffline("Active addresses on Solana vs Base this year");
+  const { chart } = await routeOffline("Active addresses on Solana vs Base this year");
   assert.match(chart.title, /chain activity/i);
   assert.deepEqual(chart.series.sort(), ["Base", "Solana"]);
 });
 
-test("protocol revenue keyword still routes correctly for the same shared entities", () => {
-  const { chart } = routeOffline("Solana vs Base protocol revenue this quarter");
+test("protocol revenue keyword still routes correctly for the same shared entities", async () => {
+  const { chart } = await routeOffline("Solana vs Base protocol revenue this quarter");
   assert.match(chart.title, /protocol revenue/i);
 });
 
-test("unmapped question returns no chart", () => {
-  const { chart, reply } = routeOffline("What's the weather like today?");
+test("unmapped question returns no chart", async () => {
+  const { chart, reply } = await routeOffline("What's the weather like today?");
   assert.equal(chart, null);
   assert.match(reply, /couldn't map/i);
 });
 
-test("a snapshot question renders a stat tile, not a trend chart", () => {
-  const { chart } = routeOffline("What's the current TVL of Aave?");
+test("a snapshot question renders a stat tile, not a trend chart", async () => {
+  const { chart } = await routeOffline("What's the current TVL of Aave?");
   assert.equal(chart.chart_type, "stat");
   assert.deepEqual(chart.series, ["Aave"]);
 });
 
-test("'current' with trend language still renders a chart, not a stat tile", () => {
-  const { chart } = routeOffline("Show the current TVL trend for Aave over time");
+test("'current' with trend language still renders a chart, not a stat tile", async () => {
+  const { chart } = await routeOffline("Show the current TVL trend for Aave over time");
   assert.notEqual(chart.chart_type, "stat");
 });
 
-test("more than 4 entities in one line chart renders as small multiples instead", () => {
+test("more than 4 entities in one line chart renders as small multiples instead", async () => {
   // No specific issuer named -> all 6 stablecoin issuers -> too many for one overlay plot.
-  const { chart } = routeOffline("Chart stablecoin supply this year");
+  const { chart } = await routeOffline("Chart stablecoin supply this year");
   assert.equal(chart.chart_type, "small_multiples");
   assert.ok(chart.series.length > 4);
 });
 
-test("a few named entities still render as a plain line chart", () => {
-  const { chart } = routeOffline("Chart USDT vs USDC supply over the last 90 days");
+test("a few named entities still render as a plain line chart", async () => {
+  const { chart } = await routeOffline("Chart USDT vs USDC supply over the last 90 days");
   assert.equal(chart.chart_type, "line");
 });
 
-test("the route with the most keyword matches wins, not the first one in array order", () => {
+test("the route with the most keyword matches wins, not the first one in array order", async () => {
   // "Lido" is a defi_tvl keyword AND a staking entity -- "staked eth" and
   // "rocket pool" (2 staking-keyword matches) must beat defi_tvl's 1 match.
-  const { chart } = routeOffline("What is the current staked eth for Lido, Coinbase and Rocket Pool?");
+  const { chart } = await routeOffline("What is the current staked eth for Lido, Coinbase and Rocket Pool?");
   assert.match(chart.title, /staking/i);
   assert.deepEqual(chart.series.sort(), ["Coinbase", "Lido", "Rocket Pool"]);
 });
@@ -82,9 +82,9 @@ const REPRESENTATIVE_QUERIES = [
   "What is the current staked eth for Lido, Coinbase and Rocket Pool?",
 ];
 
-test("every chart the offline router can produce passes the shared validator", () => {
+test("every chart the offline router can produce passes the shared validator", async () => {
   for (const query of REPRESENTATIVE_QUERIES) {
-    const { chart } = routeOffline(query);
+    const { chart } = await routeOffline(query);
     assert.ok(chart, `expected a chart for: "${query}"`);
     const { valid, issues } = validateChart(chart);
     assert.ok(valid, `"${query}" produced an invalid chart: ${issues.join("; ")}`);

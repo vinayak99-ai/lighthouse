@@ -162,7 +162,7 @@ function buildInsight(series, data, unit) {
   return `${topSeries} leads at ${formatValue(topLast, unit)}, ${direction} ${Math.abs(pct)}% over the period.`;
 }
 
-export function routeOffline(userText) {
+export async function routeOffline(userText) {
   const text = userText.toLowerCase();
   // Keyword matches are domain-specific and take priority over entity-name
   // matches alone -- e.g. "Solana" and "Base" are valid entities in both
@@ -221,7 +221,7 @@ export function routeOffline(userText) {
     ? "week"
     : "day";
 
-  const result = runTool(route.tool, args);
+  const result = await runTool(route.tool, args);
   // "current supply of X" wants a KPI tile, not a trend chart -- but only
   // when the phrasing is actually asking for a snapshot, not a history
   // ("current trend" / "since January" still means "show me the chart").
