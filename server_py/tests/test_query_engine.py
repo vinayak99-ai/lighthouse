@@ -85,3 +85,62 @@ def test_pivot_by_entity_uses_fallback_name_when_no_entity_dimension():
     pivoted = pivot_by_entity(rows, "Total supply")
     assert pivoted["series"] == ["Total supply"]
     assert pivoted["data"] == [{"x": "2026-08-01", "Total supply": 42}]
+
+
+class _FakeAdapter:
+    """Stands in for a real data-source adapter (SQLite or Snowflake) so
+    the result-sanity wiring (data/result_sanity.py, invoked from inside
+    run_grouped_time_series) can be exercised without depending on what
+    the seeded stub data happens to contain."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def bucket_expr(self, granularity):
+        return "date"
+
+    def run_query(self, sql, params):
+        return self._rows
+
+
+def _patched_source(monkeypatch, rows):
+    monkeypatch.setattr("server_py.tools.query_engine.get_data_source", lambda: _FakeAdapter(rows))
+
+
+def test_result_sanity_warning_surfaces_through_run_grouped_time_series(monkeypatch):
+    _patched_source(monkeypatch, [{"bucket": "2026-08-01", "value": 1.0}])  # stale vs. end_date below
+    result = run_grouped_time_series(
+        table="stablecoin_supply",
+        entity_col="issuer",
+        entity_allowed=DOMAINS["stablecoins"]["entities"],
+        value_col="supply_usd",
+        end_date="2026-08-22",
+    )
+    assert result["warning"] is not None
+    assert "days before the requested end date" in result["warning"]
+
+
+def test_healthy_result_has_no_warning_through_run_grouped_time_series(monkeypatch):
+    _patched_source(monkeypatch, [{"bucket": "2026-08-21", "value": 1.0}, {"bucket": "2026-08-22", "value": 2.0}])
+    result = run_grouped_time_series(
+        table="stablecoin_supply",
+        entity_col="issuer",
+        entity_allowed=DOMAINS["stablecoins"]["entities"],
+        value_col="supply_usd",
+        end_date="2026-08-22",
+    )
+    assert result["warning"] is None
+
+
+def test_runaway_row_count_raises_tool_input_error(monkeypatch):
+    from ..data.result_sanity import ROW_COUNT_LIMIT
+
+    _patched_source(monkeypatch, [{"bucket": "2026-08-22", "value": 1.0}] * (ROW_COUNT_LIMIT + 1))
+    with pytest.raises(ToolInputError, match="row safety cap"):
+        run_grouped_time_series(
+            table="stablecoin_supply",
+            entity_col="issuer",
+            entity_allowed=DOMAINS["stablecoins"]["entities"],
+            value_col="supply_usd",
+            end_date="2026-08-22",
+        )

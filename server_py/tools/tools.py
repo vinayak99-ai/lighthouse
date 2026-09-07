@@ -58,12 +58,15 @@ def _time_series_result(
     )
     rows = result["rows"]
     pivoted = pivot_by_entity(rows, fallback_series_name)
-    return {
+    output = {
         "row_count": len(rows),
         "point_count": len(pivoted["data"]),
         "series": pivoted["series"],
         "data": pivoted["data"],
     }
+    if result.get("warning"):
+        output["data_quality_warning"] = result["warning"]
+    return output
 
 
 TOOL_DEFINITIONS = [

@@ -8,6 +8,7 @@ warehouse -- see data/data_source.py).
 """
 
 from ..data.data_source import get_data_source
+from ..data.result_sanity import check_result_sanity
 
 
 class ToolInputError(Exception):
@@ -101,7 +102,18 @@ def run_grouped_time_series(
     """
 
     rows = data_source.run_query(sql, params)
-    return {"sql": sql.strip(), "rows": rows}
+
+    # The choke point every data tool's rows pass through regardless of
+    # which adapter served them -- see data/result_sanity.py for why a
+    # runaway row count fails loud (ToolInputError) while null-heavy or
+    # stale data only annotates the result with a warning instead of
+    # blocking it.
+    try:
+        warning = check_result_sanity(rows, value_col="value", end_date=end_date)
+    except ValueError as err:
+        raise ToolInputError(str(err)) from err
+
+    return {"sql": sql.strip(), "rows": rows, "warning": warning}
 
 
 def pivot_by_entity(rows: list[dict], fallback_series_name: str | None = None) -> dict:
