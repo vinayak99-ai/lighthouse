@@ -19,6 +19,7 @@ const MAX_SERIES = 8;
 const STACKED_BAR_BAR_LIMIT = 16;
 const LINE_OVERLAY_SERIES_LIMIT = 6;
 const SCATTER_POINT_LIMIT = 200;
+const TREEMAP_TILE_LIMIT = 20;
 
 // scatter's row shape is fundamentally different from every other
 // chart_type: a row is one entity's point ({ label, x, y, z?, group? }),
@@ -87,6 +88,18 @@ export function validateChart(chart) {
   if (chart_type === "scatter") {
     issues.push(...validateScatter(series, data));
     return { valid: issues.length === 0, issues };
+  }
+
+  if (chart_type === "treemap" && series.length > 1) {
+    issues.push(
+      `chart_type 'treemap' sizes each box by one metric -- \`series\` has ${series.length} entries. Use 'bar' or 'small_multiples' to compare multiple metrics instead.`
+    );
+  }
+
+  if (chart_type === "treemap" && data.length > TREEMAP_TILE_LIMIT) {
+    issues.push(
+      `treemap has ${data.length} boxes, over the ${TREEMAP_TILE_LIMIT}-tile readability cap. Keep the largest entities and fold the rest into "Other".`
+    );
   }
 
   if (chart_type === "area" && series.length > 1) {

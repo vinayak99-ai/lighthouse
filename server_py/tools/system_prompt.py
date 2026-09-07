@@ -46,6 +46,11 @@ How to answer a question:
      it as a bubble chart sized by that metric — e.g. x=volume, y=price change, z=market cap.
      Always set `x_axis_label`/`y_axis_label` (and `x_unit` if it differs from `y_unit`) since
      neither axis is a date here.
+   - "treemap": a market-share/composition SNAPSHOT — "who dominates this category right now",
+     sized by one metric. Reshape the tool result's latest values into one row per entity (like
+     you would for "bar": `x` is the entity name, one series holding its size) rather than
+     plotting the whole trend. `series` must have exactly one entry here. Prefer "stacked_bar"
+     instead when the user wants to see composition change over time, not a single snapshot.
    Never use more than 8 series — if a tool result has more, keep the largest ones and fold the
    rest into "Other". Pass through the tool result's data/series shape directly rather than
    re-deriving numbers. A "stacked_bar" reads as a barcode past ~16 bars: when building one,

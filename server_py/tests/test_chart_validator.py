@@ -3,6 +3,7 @@ from ..tools.chart_validator import (
     MAX_SERIES,
     SCATTER_POINT_LIMIT,
     STACKED_BAR_BAR_LIMIT,
+    TREEMAP_TILE_LIMIT,
     validate_chart,
 )
 
@@ -145,3 +146,38 @@ def test_scatter_still_enforces_max_series():
     result = validate_chart(_scatter_chart(series=series, data=data))
     assert result["valid"] is False
     assert any(f"{MAX_SERIES}-series cap" in issue for issue in result["issues"])
+
+
+def _treemap_chart(**overrides):
+    base = {
+        "chart_type": "treemap",
+        "title": "t",
+        "series": ["tvl"],
+        "data": [{"x": "Aave", "tvl": 22_010_000_000}, {"x": "Curve", "tvl": 2_330_000_000}],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_valid_treemap():
+    result = validate_chart(_treemap_chart())
+    assert result == {"valid": True, "issues": []}
+
+
+def test_treemap_with_more_than_one_series_is_invalid():
+    result = validate_chart(_treemap_chart(series=["tvl", "volume"], data=[{"x": "Aave", "tvl": 1, "volume": 2}]))
+    assert result["valid"] is False
+    assert any("one metric" in issue for issue in result["issues"])
+
+
+def test_treemap_over_tile_limit_is_invalid():
+    data = [{"x": f"e{i}", "tvl": i} for i in range(TREEMAP_TILE_LIMIT + 1)]
+    result = validate_chart(_treemap_chart(data=data))
+    assert result["valid"] is False
+    assert any(f"{TREEMAP_TILE_LIMIT}-tile" in issue for issue in result["issues"])
+
+
+def test_treemap_within_tile_limit_is_valid():
+    data = [{"x": f"e{i}", "tvl": i} for i in range(TREEMAP_TILE_LIMIT)]
+    result = validate_chart(_treemap_chart(data=data))
+    assert result["valid"] is True

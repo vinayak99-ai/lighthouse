@@ -17,6 +17,7 @@ MAX_SERIES = 8
 STACKED_BAR_BAR_LIMIT = 16
 LINE_OVERLAY_SERIES_LIMIT = 6
 SCATTER_POINT_LIMIT = 200
+TREEMAP_TILE_LIMIT = 20
 
 
 def _validate_scatter(series: list, data: list) -> list[str]:
@@ -91,6 +92,18 @@ def validate_chart(chart: dict | None) -> dict:
         issues.append(
             "chart_type 'area' with more than one independent series overlaps into a muddy band "
             "(or misrepresents the entities if stacked). Use 'line' for a multi-entity trend instead."
+        )
+
+    if chart_type == "treemap" and len(series) > 1:
+        issues.append(
+            f"chart_type 'treemap' sizes each box by one metric -- `series` has {len(series)} entries. "
+            "Use 'bar' or 'small_multiples' to compare multiple metrics instead."
+        )
+
+    if chart_type == "treemap" and len(data) > TREEMAP_TILE_LIMIT:
+        issues.append(
+            f"treemap has {len(data)} boxes, over the {TREEMAP_TILE_LIMIT}-tile readability cap. "
+            'Keep the largest entities and fold the rest into "Other".'
         )
 
     if chart_type == "stacked_bar" and len(data) > STACKED_BAR_BAR_LIMIT:

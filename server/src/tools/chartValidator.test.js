@@ -162,3 +162,43 @@ test("scatter still enforces the max-series cap", () => {
   assert.equal(valid, false);
   assert.match(issues.join(" "), /8-series cap/);
 });
+
+function treemapChart(overrides = {}) {
+  return {
+    chart_type: "treemap",
+    title: "Test treemap",
+    series: ["tvl"],
+    data: [
+      { x: "Aave", tvl: 22_010_000_000 },
+      { x: "Curve", tvl: 2_330_000_000 },
+    ],
+    ...overrides,
+  };
+}
+
+test("a well-formed treemap passes", () => {
+  const { valid, issues } = validateChart(treemapChart());
+  assert.equal(valid, true);
+  assert.deepEqual(issues, []);
+});
+
+test("a treemap with more than one series is rejected", () => {
+  const { valid, issues } = validateChart(
+    treemapChart({ series: ["tvl", "volume"], data: [{ x: "Aave", tvl: 1, volume: 2 }] })
+  );
+  assert.equal(valid, false);
+  assert.match(issues.join(" "), /one metric/);
+});
+
+test("a treemap over the tile limit is rejected", () => {
+  const data = Array.from({ length: 21 }, (_, i) => ({ x: `e${i}`, tvl: i }));
+  const { valid, issues } = validateChart(treemapChart({ data }));
+  assert.equal(valid, false);
+  assert.match(issues.join(" "), /20-tile/);
+});
+
+test("a treemap within the tile limit is fine", () => {
+  const data = Array.from({ length: 20 }, (_, i) => ({ x: `e${i}`, tvl: i }));
+  const { valid } = validateChart(treemapChart({ data }));
+  assert.equal(valid, true);
+});

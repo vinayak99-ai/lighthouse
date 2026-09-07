@@ -5,14 +5,15 @@ import StackedBarChart from "../charts/StackedBarChart.jsx";
 import StatTile from "../charts/StatTile.jsx";
 import SmallMultiples from "../charts/SmallMultiples.jsx";
 import ScatterBubbleChart from "../charts/ScatterBubbleChart.jsx";
+import TreemapChart from "../charts/TreemapChart.jsx";
 import ChartLegend from "../charts/ChartLegend.jsx";
 import { formatCompact, formatDateLabel } from "../lib/chartTheme.js";
 
-// "stat" and "small_multiples" self-label every value/facet directly (a name
-// beside each tile or above each mini-chart) -- color isn't the identity
-// channel there, so the color-matching legend those other forms need would
-// just restate what's already on screen.
-const SELF_LABELED_TYPES = new Set(["stat", "small_multiples"]);
+// "stat", "small_multiples", and "treemap" self-label every value/facet/box
+// directly (a name beside each tile, above each mini-chart, or inside each
+// box) -- color isn't the identity channel there, so the color-matching
+// legend those other forms need would just restate what's already on screen.
+const SELF_LABELED_TYPES = new Set(["stat", "small_multiples", "treemap"]);
 
 export default function ChartCard({ chart }) {
   const [showTable, setShowTable] = useState(false);
@@ -86,6 +87,8 @@ export default function ChartCard({ chart }) {
         <StackedBarChart {...chartProps} />
       ) : chart_type === "scatter" ? (
         <ScatterBubbleChart {...scatterProps} />
+      ) : chart_type === "treemap" ? (
+        <TreemapChart {...chartProps} />
       ) : (
         <TimeSeriesChart type={chart_type} {...chartProps} />
       )}

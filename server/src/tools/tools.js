@@ -180,8 +180,11 @@ export const TOOL_DEFINITIONS = [
       "'bar' for magnitude comparison, 'stacked_bar' for part-to-whole over time, 'stat' for a single current value (a KPI, not " +
       "a trend), 'small_multiples' for many entities' trend shapes at once, 'scatter' for comparing two numeric metrics across " +
       "entities (correlation, risk/return) -- add a `z` value per point to render it as a bubble chart sized by a third metric. " +
+      "'treemap' for a market-share/composition SNAPSHOT sized by one metric -- 'who dominates this category right now' -- use " +
+      "'stacked_bar' instead when the user wants to see composition change over time. " +
       "`series` lists the entity keys in the order they should be colored (max 8, fold extras into 'Other') for every " +
-      "chart_type except 'scatter', where it instead lists the point-group names (usually just one). `data` is an array of " +
+      "chart_type except 'scatter' (point-group names instead, usually just one) and 'treemap' (exactly one entry -- the " +
+      "metric each box is sized by; put entity names in `data`'s `x` field instead, like 'bar'). `data` is an array of " +
       "rows shaped { x: <date or category label>, <series key>: <number>, ... } for every chart_type except 'scatter', " +
       "ascending by x -- 'stat' and 'small_multiples' use this same shape too, they just render it differently. 'scatter' " +
       "rows are shaped { label: <entity name>, x: <number>, y: <number>, z: <number, optional, bubble size>, " +
@@ -190,7 +193,7 @@ export const TOOL_DEFINITIONS = [
     input_schema: {
       type: "object",
       properties: {
-        chart_type: { type: "string", enum: ["line", "area", "bar", "stacked_bar", "stat", "small_multiples", "scatter"] },
+        chart_type: { type: "string", enum: ["line", "area", "bar", "stacked_bar", "stat", "small_multiples", "scatter", "treemap"] },
         title: { type: "string" },
         subtitle: { type: "string", description: "One short sentence of context (units, date range)." },
         y_unit: { type: "string", enum: ["usd", "count", "percent"], description: "How to format axis ticks and tooltip values (the y-axis metric, for 'scatter')." },
