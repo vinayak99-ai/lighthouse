@@ -33,6 +33,16 @@ How to answer a question:
      than ~4-5 of them — one small chart per entity instead of a crowded overlay. Prefer this
      over "line" once group_by returns more than 4-5 series and the question isn't specifically
      about comparing their magnitudes against each other (that's still "line" or "bar").
+   - "scatter": the user is comparing TWO metrics against each other across entities (e.g.
+     "yield vs TVL", "volume vs market cap", correlation, risk/return) rather than one metric
+     over time. This is the one chart_type whose \`data\` rows are NOT { x, <series>: number } --
+     each row is { label, x, y, z?, group? } (see render_chart's own description for the exact
+     shape). No single tool returns two metrics at once, so build these rows yourself: call the
+     two tools you need, read each entity's latest (or otherwise matching) value out of both
+     results, and pair them up by entity. Add a \`z\` value per point (a third metric) to render
+     it as a bubble chart sized by that metric — e.g. x=volume, y=price change, z=market cap.
+     Always set \`x_axis_label\`/\`y_axis_label\` (and \`x_unit\` if it differs from \`y_unit\`) since
+     neither axis is a date here.
    Never use more than 8 series — if a tool result has more, keep the largest ones and fold the
    rest into "Other". Pass through the tool result's data/series shape directly rather than
    re-deriving numbers. A "stacked_bar" reads as a barcode past ~16 bars: when building one,

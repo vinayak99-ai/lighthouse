@@ -265,23 +265,34 @@ TOOL_DEFINITIONS = [
         "description": (
             "Render the final chart for the user. Call this once you have the data you need. type='line'/'area' for "
             "trend over time, 'bar' for magnitude comparison, 'stacked_bar' for part-to-whole over time, 'stat' for a "
-            "single current value (a KPI, not a trend), 'small_multiples' for many entities' trend shapes at once. "
-            "`series` lists the entity keys in the order they should be colored (max 8, fold extras into 'Other'). "
-            "`data` is an array of rows shaped { x: <date or category label>, <series key>: <number>, ... } -- the "
-            "same shape for every chart_type, 'stat' and 'small_multiples' included; they just render it differently."
+            "single current value (a KPI, not a trend), 'small_multiples' for many entities' trend shapes at once, "
+            "'scatter' for comparing two numeric metrics across entities (correlation, risk/return) -- add a `z` "
+            "value per point to render it as a bubble chart sized by a third metric. "
+            "`series` lists the entity keys in the order they should be colored (max 8, fold extras into 'Other') "
+            "for every chart_type except 'scatter', where it instead lists the point-group names (usually just one). "
+            "`data` is an array of rows shaped { x: <date or category label>, <series key>: <number>, ... } for every "
+            "chart_type except 'scatter', ascending by x -- 'stat' and 'small_multiples' use this same shape too, "
+            "they just render it differently. 'scatter' rows are shaped { label: <entity name>, x: <number>, "
+            "y: <number>, z: <number, optional, bubble size>, group: <one of `series`, optional if `series` has one "
+            "entry> } instead -- x/y are two different metrics for the same entity, not a date and a value, so build "
+            "them yourself from prior tool results rather than passing one straight through."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "chart_type": {"type": "string", "enum": ["line", "area", "bar", "stacked_bar", "stat", "small_multiples"]},
+                "chart_type": {"type": "string", "enum": ["line", "area", "bar", "stacked_bar", "stat", "small_multiples", "scatter"]},
                 "title": {"type": "string"},
                 "subtitle": {"type": "string", "description": "One short sentence of context (units, date range)."},
-                "y_unit": {"type": "string", "enum": ["usd", "count", "percent"], "description": "How to format axis ticks and tooltip values."},
+                "y_unit": {"type": "string", "enum": ["usd", "count", "percent"], "description": "How to format axis ticks and tooltip values (the y-axis metric, for 'scatter')."},
+                "x_unit": {"type": "string", "enum": ["usd", "count", "percent"], "description": "'scatter' only: how to format the x-axis metric."},
+                "x_axis_label": {"type": "string", "description": "'scatter' only: name of the x-axis metric, e.g. 'TVL (USD)'."},
+                "y_axis_label": {"type": "string", "description": "'scatter' only: name of the y-axis metric."},
+                "z_axis_label": {"type": "string", "description": "'scatter' only: name of the bubble-size metric, if any point has a `z` value."},
                 "series": {"type": "array", "items": {"type": "string"}, "maxItems": 8},
                 "data": {
                     "type": "array",
                     "items": {"type": "object"},
-                    "description": "Rows shaped { x, <series key>: number, ... }, ascending by x.",
+                    "description": "Rows shaped { x, <series key>: number, ... }, ascending by x -- or, for 'scatter', { label, x, y, z?, group? }.",
                 },
                 "insight": {"type": "string", "description": "One or two sentence takeaway a sharp analyst would say about this chart."},
             },

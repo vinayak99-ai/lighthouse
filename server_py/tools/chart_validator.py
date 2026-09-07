@@ -16,6 +16,47 @@ Used two ways:
 MAX_SERIES = 8
 STACKED_BAR_BAR_LIMIT = 16
 LINE_OVERLAY_SERIES_LIMIT = 6
+SCATTER_POINT_LIMIT = 200
+
+
+def _validate_scatter(series: list, data: list) -> list[str]:
+    """scatter's row shape is fundamentally different from every other
+    chart_type: a row is one entity's point ({label, x, y, z?, group?}),
+    not a time/category bucket with one column per series -- so it gets
+    its own checks instead of the generic per-series-column ones below."""
+    issues: list[str] = []
+
+    if len(data) > SCATTER_POINT_LIMIT:
+        issues.append(
+            f"scatter has {len(data)} points, over the {SCATTER_POINT_LIMIT}-point readability cap. "
+            "Aggregate or filter down to the entities that matter most."
+        )
+
+    group_names = set(series)
+    bad_rows = 0
+    bad_groups: set = set()
+    for row in data:
+        x_ok = isinstance(row.get("x"), (int, float)) and not isinstance(row.get("x"), bool)
+        y_ok = isinstance(row.get("y"), (int, float)) and not isinstance(row.get("y"), bool)
+        label_ok = isinstance(row.get("label"), str) and row.get("label") != ""
+        if not (x_ok and y_ok and label_ok):
+            bad_rows += 1
+        group = row.get("group", series[0] if series else None)
+        if group not in group_names:
+            bad_groups.add(group)
+
+    if bad_rows:
+        issues.append(
+            f"{bad_rows} of {len(data)} scatter points are missing a numeric `x`, numeric `y`, or a non-empty "
+            "`label` -- every point needs all three."
+        )
+    if bad_groups:
+        issues.append(
+            f"These point `group` values don't match any entry in `series`: {', '.join(str(g) for g in bad_groups)}. "
+            "Every point's group must be one of the declared series names."
+        )
+
+    return issues
 
 
 def validate_chart(chart: dict | None) -> dict:
@@ -41,6 +82,10 @@ def validate_chart(chart: dict | None) -> dict:
             f"`series` has {len(series)} entries, over the {MAX_SERIES}-series cap. "
             'Keep the largest ones and fold the rest into "Other".'
         )
+
+    if chart_type == "scatter":
+        issues.extend(_validate_scatter(series, data))
+        return {"valid": len(issues) == 0, "issues": issues}
 
     if chart_type == "area" and len(series) > 1:
         issues.append(

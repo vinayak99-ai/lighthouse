@@ -4,6 +4,7 @@ import CategoryBarChart from "../charts/CategoryBarChart.jsx";
 import StackedBarChart from "../charts/StackedBarChart.jsx";
 import StatTile from "../charts/StatTile.jsx";
 import SmallMultiples from "../charts/SmallMultiples.jsx";
+import ScatterBubbleChart from "../charts/ScatterBubbleChart.jsx";
 import ChartLegend from "../charts/ChartLegend.jsx";
 import { formatCompact, formatDateLabel } from "../lib/chartTheme.js";
 
@@ -17,7 +18,7 @@ export default function ChartCard({ chart }) {
   const [showTable, setShowTable] = useState(false);
   const [hoveredSeries, setHoveredSeries] = useState(null);
   const [hiddenSeries, setHiddenSeries] = useState(() => new Set());
-  const { chart_type, title, subtitle, series, data, insight, y_unit } = chart;
+  const { chart_type, title, subtitle, series, data, insight, y_unit, x_unit, x_axis_label, y_axis_label, z_axis_label } = chart;
 
   function toggleSeries(name) {
     setHiddenSeries((prev) => {
@@ -29,6 +30,7 @@ export default function ChartCard({ chart }) {
   }
 
   const chartProps = { data, series, unit: y_unit, hoveredSeries, hiddenSeries };
+  const scatterProps = { ...chartProps, xUnit: x_unit, xAxisLabel: x_axis_label, yAxisLabel: y_axis_label, zAxisLabel: z_axis_label };
 
   return (
     <div
@@ -70,7 +72,9 @@ export default function ChartCard({ chart }) {
         <ChartLegend series={series} hiddenSeries={hiddenSeries} onToggle={toggleSeries} onHover={setHoveredSeries} />
       )}
 
-      {showTable ? (
+      {showTable && chart_type === "scatter" ? (
+        <ScatterDataTable data={data} unit={y_unit} xUnit={x_unit} xAxisLabel={x_axis_label} yAxisLabel={y_axis_label} zAxisLabel={z_axis_label} />
+      ) : showTable ? (
         <DataTable data={data} series={series} unit={y_unit} />
       ) : chart_type === "stat" ? (
         <StatTile data={data} series={series} unit={y_unit} />
@@ -80,6 +84,8 @@ export default function ChartCard({ chart }) {
         <CategoryBarChart {...chartProps} />
       ) : chart_type === "stacked_bar" ? (
         <StackedBarChart {...chartProps} />
+      ) : chart_type === "scatter" ? (
+        <ScatterBubbleChart {...scatterProps} />
       ) : (
         <TimeSeriesChart type={chart_type} {...chartProps} />
       )}
@@ -116,6 +122,37 @@ function DataTable({ data, series, unit }) {
                   {formatCompact(row[s], unit)}
                 </td>
               ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ScatterDataTable({ data, unit, xUnit, xAxisLabel, yAxisLabel, zAxisLabel }) {
+  const hasZ = data.some((row) => row.z !== undefined && row.z !== null);
+  const hasGroup = data.some((row) => row.group !== undefined && row.group !== null);
+  return (
+    <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Entity</th>
+            <th style={{ ...thStyle, textAlign: "right" }}>{xAxisLabel || "x"}</th>
+            <th style={{ ...thStyle, textAlign: "right" }}>{yAxisLabel || "y"}</th>
+            {hasZ && <th style={{ ...thStyle, textAlign: "right" }}>{zAxisLabel || "z"}</th>}
+            {hasGroup && <th style={thStyle}>Group</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={`${row.label}-${i}`}>
+              <td style={tdStyle}>{row.label}</td>
+              <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatCompact(row.x, xUnit)}</td>
+              <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatCompact(row.y, unit)}</td>
+              {hasZ && <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatCompact(row.z)}</td>}
+              {hasGroup && <td style={tdStyle}>{row.group}</td>}
             </tr>
           ))}
         </tbody>

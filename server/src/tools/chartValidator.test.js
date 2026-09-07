@@ -95,3 +95,70 @@ test("a series that never has a value anywhere is flagged", () => {
   assert.equal(valid, false);
   assert.match(issues.join(" "), /Ghost/);
 });
+
+function scatterChart(overrides = {}) {
+  return {
+    chart_type: "scatter",
+    title: "Test scatter",
+    series: ["value"],
+    data: [{ label: "Aave", x: 1, y: 2, group: "value" }],
+    ...overrides,
+  };
+}
+
+test("a well-formed ungrouped scatter chart passes", () => {
+  const { valid, issues } = validateChart(scatterChart());
+  assert.equal(valid, true);
+  assert.deepEqual(issues, []);
+});
+
+test("scatter group is optional when series has a single entry", () => {
+  const { valid } = validateChart(scatterChart({ data: [{ label: "Aave", x: 1, y: 2 }] }));
+  assert.equal(valid, true);
+});
+
+test("a bubble chart (z + multiple groups) passes", () => {
+  const { valid } = validateChart(
+    scatterChart({
+      series: ["L1", "L2"],
+      data: [
+        { label: "Ethereum", x: 100, y: 2.5, z: 4e11, group: "L1" },
+        { label: "Arbitrum", x: 20, y: -1.2, z: 3e9, group: "L2" },
+      ],
+    })
+  );
+  assert.equal(valid, true);
+});
+
+test("a scatter point missing x or y is rejected", () => {
+  const { valid, issues } = validateChart(scatterChart({ data: [{ label: "Aave", y: 2 }] }));
+  assert.equal(valid, false);
+  assert.match(issues.join(" "), /numeric `x`/);
+});
+
+test("a scatter point missing a label is rejected", () => {
+  const { valid } = validateChart(scatterChart({ data: [{ x: 1, y: 2 }] }));
+  assert.equal(valid, false);
+});
+
+test("a scatter point group not in series is rejected", () => {
+  const { valid, issues } = validateChart(scatterChart({ data: [{ label: "Aave", x: 1, y: 2, group: "nope" }] }));
+  assert.equal(valid, false);
+  assert.match(issues.join(" "), /nope/);
+});
+
+test("scatter over the point limit is rejected", () => {
+  const data = Array.from({ length: 201 }, (_, i) => ({ label: `e${i}`, x: i, y: i, group: "value" }));
+  const { valid, issues } = validateChart(scatterChart({ data }));
+  assert.equal(valid, false);
+  assert.match(issues.join(" "), /200-point/);
+});
+
+test("scatter still enforces the max-series cap", () => {
+  const series = Array.from({ length: 9 }, (_, i) => `S${i}`);
+  const { valid, issues } = validateChart(
+    scatterChart({ series, data: [{ label: "e", x: 1, y: 1, group: series[0] }] })
+  );
+  assert.equal(valid, false);
+  assert.match(issues.join(" "), /8-series cap/);
+});

@@ -18,6 +18,46 @@
 const MAX_SERIES = 8;
 const STACKED_BAR_BAR_LIMIT = 16;
 const LINE_OVERLAY_SERIES_LIMIT = 6;
+const SCATTER_POINT_LIMIT = 200;
+
+// scatter's row shape is fundamentally different from every other
+// chart_type: a row is one entity's point ({ label, x, y, z?, group? }),
+// not a time/category bucket with one column per series -- so it gets its
+// own checks instead of the generic per-series-column ones below.
+function validateScatter(series, data) {
+  const issues = [];
+
+  if (data.length > SCATTER_POINT_LIMIT) {
+    issues.push(
+      `scatter has ${data.length} points, over the ${SCATTER_POINT_LIMIT}-point readability cap. Aggregate or filter down to the entities that matter most.`
+    );
+  }
+
+  const groupNames = new Set(series);
+  let badRows = 0;
+  const badGroups = new Set();
+  for (const row of data) {
+    const xOk = typeof row.x === "number" && !Number.isNaN(row.x);
+    const yOk = typeof row.y === "number" && !Number.isNaN(row.y);
+    const labelOk = typeof row.label === "string" && row.label !== "";
+    if (!(xOk && yOk && labelOk)) badRows++;
+    const group = row.group ?? series[0];
+    if (!groupNames.has(group)) badGroups.add(group);
+  }
+
+  if (badRows > 0) {
+    issues.push(
+      `${badRows} of ${data.length} scatter points are missing a numeric \`x\`, numeric \`y\`, or a non-empty \`label\` -- every point needs all three.`
+    );
+  }
+  if (badGroups.size > 0) {
+    issues.push(
+      `These point \`group\` values don't match any entry in \`series\`: ${[...badGroups].join(", ")}. Every point's group must be one of the declared series names.`
+    );
+  }
+
+  return issues;
+}
 
 export function validateChart(chart) {
   const issues = [];
@@ -42,6 +82,11 @@ export function validateChart(chart) {
     issues.push(
       `\`series\` has ${series.length} entries, over the ${MAX_SERIES}-series cap. Keep the largest ones and fold the rest into "Other".`
     );
+  }
+
+  if (chart_type === "scatter") {
+    issues.push(...validateScatter(series, data));
+    return { valid: issues.length === 0, issues };
   }
 
   if (chart_type === "area" && series.length > 1) {
