@@ -9,6 +9,9 @@ and run_tool() (execute a tool call by name and return its JSON result).
 """
 
 from ..data.entities import DOMAINS, END_DATE, START_DATE
+from ..data.market_data_api import fetch_daily_bars
+from ..data.market_tickers import MARKET_DATA_START_DATE, MARKET_TICKERS
+from .market_data_query import resample
 from .query_engine import ToolInputError, pivot_by_entity, run_grouped_time_series
 
 DATE_PROPS = {
@@ -261,6 +264,37 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "query_market_data",
+        "description": (
+            "Time series of traditional market index/equity price data, via a separate market-data API "
+            "integration -- NOT one of the on-chain domains above. Available tickers: "
+            + ", ".join(MARKET_TICKERS.keys())
+            + f". Data available from {MARKET_DATA_START_DATE} to {END_DATE}. Use metric='level' for a price "
+            "trend (pairs with chart_type 'line'/'area'). Use metric='return_pct' for period-over-period percent "
+            "change -- e.g. \"weekly/monthly/quarterly performance\" or \"return\" -- which pairs with chart_type "
+            "'bar' (one bar per period); pick granularity to match the period the user asked about."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string", "enum": list(MARKET_TICKERS.keys())},
+                "metric": {
+                    "type": "string",
+                    "enum": ["level", "return_pct"],
+                    "description": "'level' for the raw price series; 'return_pct' for percent change vs. the prior period.",
+                },
+                "start_date": {"type": "string", "description": f"Inclusive start date, YYYY-MM-DD. Data available from {MARKET_DATA_START_DATE}."},
+                "end_date": {"type": "string", "description": f"Inclusive end date, YYYY-MM-DD. Data available through {END_DATE}."},
+                "granularity": {
+                    "type": "string",
+                    "enum": ["day", "week", "month", "quarter"],
+                    "description": "Time bucket size. 'quarter' is only meaningful here, not on the on-chain tools.",
+                },
+            },
+            "required": ["ticker"],
+        },
+    },
+    {
         "name": "render_chart",
         "description": (
             "Render the final chart for the user. Call this once you have the data you need. type='line'/'area' for "
@@ -460,6 +494,25 @@ def _query_x402_agentic_payments(args: dict) -> dict:
     )
 
 
+def _query_market_data(args: dict) -> dict:
+    ticker_name = args.get("ticker")
+    if ticker_name not in MARKET_TICKERS:
+        raise ToolInputError(f"Unknown ticker: {ticker_name}. Valid values: {', '.join(MARKET_TICKERS.keys())}")
+    ticker_code = MARKET_TICKERS[ticker_name]["code"]
+    metric = args.get("metric", "level")
+    granularity = args.get("granularity") or ("month" if metric == "return_pct" else "day")
+    bars = fetch_daily_bars(ticker_code, args.get("start_date"), args.get("end_date"))
+    if not bars:
+        raise ToolInputError(f"No market data for {ticker_name} in that date range.")
+    result = resample(bars, granularity=granularity, metric=metric, series_name=ticker_name)
+    return {
+        "row_count": len(bars),
+        "point_count": len(result["data"]),
+        "series": result["series"],
+        "data": result["data"],
+    }
+
+
 HANDLERS = {
     "query_stablecoin_supply": _query_stablecoin_supply,
     "query_defi_tvl": _query_defi_tvl,
@@ -471,6 +524,7 @@ HANDLERS = {
     "query_staking": _query_staking,
     "query_nft_volume": _query_nft_volume,
     "query_x402_agentic_payments": _query_x402_agentic_payments,
+    "query_market_data": _query_market_data,
 }
 
 
