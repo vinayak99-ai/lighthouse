@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { seedAll } from "../data/seed.js";
 import { routeOffline } from "./fallbackRouter.js";
+import { validateChart } from "../tools/chartValidator.js";
 
 test.before(() => {
   seedAll();
@@ -56,4 +57,36 @@ test("the route with the most keyword matches wins, not the first one in array o
   const { chart } = routeOffline("What is the current staked eth for Lido, Coinbase and Rocket Pool?");
   assert.match(chart.title, /staking/i);
   assert.deepEqual(chart.series.sort(), ["Coinbase", "Lido", "Rocket Pool"]);
+});
+
+// The offline router's heuristics (granularity bumping, small_multiples
+// auto-switch, stat detection) were hand-tuned against chartValidator.js's
+// rules separately from the live-model retry loop in the providers. This
+// sweep is the regression guard that keeps them in sync: every chart the
+// router can produce, across every domain and phrasing style, must pass the
+// same check the live path enforces.
+const REPRESENTATIVE_QUERIES = [
+  "Chart USDT vs USDC supply over the last 90 days",
+  "Chart stablecoin supply this year",
+  "Show TVL for Aave, Lido and EigenLayer this year",
+  "DeFi TVL breakdown by protocol",
+  "Compare open interest across Hyperliquid, dYdX and GMX",
+  "Prediction market volume by platform, last 30 days",
+  "Tokenized RWA value share by issuer breakdown",
+  "Ethereum vs Solana protocol revenue, last quarter",
+  "Active addresses on Solana vs Base this year",
+  "Staked ETH by provider over the last 6 months",
+  "Blur vs OpenSea volume, last 30 days",
+  "x402 agentic payment volume by agent network",
+  "What's the current TVL of Aave?",
+  "What is the current staked eth for Lido, Coinbase and Rocket Pool?",
+];
+
+test("every chart the offline router can produce passes the shared validator", () => {
+  for (const query of REPRESENTATIVE_QUERIES) {
+    const { chart } = routeOffline(query);
+    assert.ok(chart, `expected a chart for: "${query}"`);
+    const { valid, issues } = validateChart(chart);
+    assert.ok(valid, `"${query}" produced an invalid chart: ${issues.join("; ")}`);
+  }
 });

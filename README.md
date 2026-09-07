@@ -100,6 +100,23 @@ toggle as the accessibility fallback. Stacked bars re-bucket to week/month
 past ~2 weeks of daily data so they don't collapse into an unreadable
 barcode of hairline bars.
 
+## Self-correcting chart choices
+
+`server/src/tools/chartValidator.js` codifies the same rules the system
+prompt asks the model to follow (area fill only for a single series,
+stacked bars capped before they read as a barcode, too many overlapping
+lines should be `small_multiples` instead) as an enforced check rather than
+prose the model might not perfectly follow. Both LLM providers run it the
+instant `render_chart` is called: a failure never reaches the chat -- it
+goes back to the model as a corrective tool result, and the model retries
+within the same turn (capped at 2 corrections, so a stubborn model still
+gets an answer instead of nothing). The user only ever sees the corrected
+result. This keeps the "generate, self-check, correct" loop other agentic
+charting tools use, without turning Lighthouse into a multi-step wizard --
+one question still gets one answer, just a more reliably well-formed one.
+The offline router's own heuristics are asserted against the same validator
+as a regression guard (`fallbackRouter.test.js`).
+
 ## Running it
 
 ```bash

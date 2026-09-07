@@ -1,9 +1,11 @@
 import OpenAI from "openai";
 import { TOOL_DEFINITIONS, runTool, ToolInputError } from "../../tools/tools.js";
 import { buildSystemPrompt } from "../../tools/systemPrompt.js";
+import { validateChart } from "../../tools/chartValidator.js";
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 const MAX_TURNS = 6;
+const MAX_CHART_CORRECTIONS = 2;
 
 // Anthropic's tool shape is { name, description, input_schema }.
 // OpenAI's function-calling shape wraps the same JSON schema differently.
@@ -21,19 +23,25 @@ const OPENAI_TOOLS = toOpenAiTools(TOOL_DEFINITIONS);
  * Completions function-calling shape: tool calls arrive on
  * `message.tool_calls`, and each result goes back as its own
  * { role: "tool", tool_call_id, content } message instead of a single
- * tool_result block.
+ * tool_result block. render_chart is checked against chartValidator.js and
+ * only accepted once it passes -- see the Anthropic provider's docstring
+ * for why (self-correction hidden inside the turn, never shown to the user).
+ *
+ * `client` is injectable so tests can pass a fake with a scripted
+ * `chat.completions.create` instead of hitting the real API.
  */
-export async function runConversation(history, apiKey) {
-  const client = new OpenAI({ apiKey });
+export async function runConversation(history, apiKey, client) {
+  const openai = client || new OpenAI({ apiKey });
   const messages = [
     { role: "system", content: buildSystemPrompt() },
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
   let chart = null;
   let replyText = "";
+  let chartCorrections = 0;
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const response = await client.chat.completions.create({
+    const response = await openai.chat.completions.create({
       model: MODEL,
       messages,
       tools: OPENAI_TOOLS,
@@ -50,8 +58,18 @@ export async function runConversation(history, apiKey) {
     for (const call of toolCalls) {
       const args = safeParse(call.function.arguments);
       if (call.function.name === "render_chart") {
-        chart = args;
-        messages.push({ role: "tool", tool_call_id: call.id, content: "Chart rendered and shown to the user." });
+        const { valid, issues } = validateChart(args);
+        if (valid || chartCorrections >= MAX_CHART_CORRECTIONS) {
+          chart = args;
+          messages.push({ role: "tool", tool_call_id: call.id, content: "Chart rendered and shown to the user." });
+        } else {
+          chartCorrections++;
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: `This chart won't render well:\n- ${issues.join("\n- ")}\nCall render_chart again with a fix.`,
+          });
+        }
         continue;
       }
       try {
