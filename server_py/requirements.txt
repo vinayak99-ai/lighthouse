@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+
+# Optional, only needed for the LIGHTHOUSE_LLM_PROVIDER=bedrock path
+# (server_py/chat/providers/bedrock.py imports it lazily):
+# boto3
+
+# Optional, only needed for LIGHTHOUSE_DATA_SOURCE=snowflake
+# (server_py/data/adapters/snowflake_adapter.py imports it lazily):
+# snowflake-connector-python
+
+pytest
+httpx

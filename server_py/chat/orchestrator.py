@@ -56,11 +56,18 @@ def _build_client(provider: str) -> LLMClient:
 
 
 def active_model() -> str | None:
+    """Reads the configured model name straight from the environment rather
+    than constructing a client, so /api/health stays cheap and never fails
+    just because boto3 isn't installed or the corporate wrapper isn't wired
+    yet (see providers/bedrock.py, providers/corporate.py)."""
     provider = _resolve_provider()
-    if provider is None:
-        return None
-    client = _build_client(provider)
-    return getattr(client, "model_id", None) or getattr(client, "model", None)
+    if provider == "bedrock":
+        from .providers.bedrock import DEFAULT_MODEL_ID
+
+        return os.environ.get("BEDROCK_MODEL_ID", DEFAULT_MODEL_ID)
+    if provider == "corporate":
+        return os.environ.get("LIGHTHOUSE_CORPORATE_LLM_MODEL")
+    return None
 
 
 def _history_to_converse(history: list[dict]) -> list[dict]:
