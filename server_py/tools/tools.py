@@ -11,7 +11,7 @@ and run_tool() (execute a tool call by name and return its JSON result).
 from ..data.entities import DOMAINS, END_DATE, START_DATE
 from ..data.market_data_api import fetch_daily_bars
 from ..data.market_tickers import MARKET_DATA_START_DATE, MARKET_TICKERS
-from .market_data_query import resample
+from .market_data_query import resample_multi
 from .query_engine import ToolInputError, pivot_by_entity, run_grouped_time_series
 
 DATE_PROPS = {
@@ -272,15 +272,22 @@ TOOL_DEFINITIONS = [
             "Time series of traditional market index/equity price data, via a separate market-data API "
             "integration -- NOT one of the on-chain domains above. Available tickers: "
             + ", ".join(MARKET_TICKERS.keys())
-            + f". Data available from {MARKET_DATA_START_DATE} to {END_DATE}. Use metric='level' for a price "
-            "trend (pairs with chart_type 'line'/'area'). Use metric='return_pct' for period-over-period percent "
-            "change -- e.g. \"weekly/monthly/quarterly performance\" or \"return\" -- which pairs with chart_type "
-            "'bar' (one bar per period); pick granularity to match the period the user asked about."
+            + f". Data available from {MARKET_DATA_START_DATE} to {END_DATE}. Pass more than one entry in "
+            "`tickers` to compare them on one chart -- one series per ticker, aligned by period, same as "
+            "requesting multiple entities from any other tool. Use metric='level' for a price trend (pairs "
+            "with chart_type 'line'/'area' for one ticker, 'line' to compare several). Use metric='return_pct' "
+            "for period-over-period percent change -- e.g. \"weekly/monthly/quarterly performance\" or "
+            "\"return\" -- which pairs with chart_type 'bar' for one ticker, 'line' to compare several; pick "
+            "granularity to match the period the user asked about."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "ticker": {"type": "string", "enum": list(MARKET_TICKERS.keys())},
+                "tickers": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": list(MARKET_TICKERS.keys())},
+                    "description": "One or more ticker display names. Pass more than one to compare them on the same chart.",
+                },
                 "metric": {
                     "type": "string",
                     "enum": ["level", "return_pct"],
@@ -294,7 +301,7 @@ TOOL_DEFINITIONS = [
                     "description": "Time bucket size. 'quarter' is only meaningful here, not on the on-chain tools.",
                 },
             },
-            "required": ["ticker"],
+            "required": ["tickers"],
         },
     },
     {
@@ -498,18 +505,28 @@ def _query_x402_agentic_payments(args: dict) -> dict:
 
 
 def _query_market_data(args: dict) -> dict:
-    ticker_name = args.get("ticker")
-    if ticker_name not in MARKET_TICKERS:
-        raise ToolInputError(f"Unknown ticker: {ticker_name}. Valid values: {', '.join(MARKET_TICKERS.keys())}")
-    ticker_code = MARKET_TICKERS[ticker_name]["code"]
+    ticker_names = args.get("tickers") or []
+    if not ticker_names:
+        raise ToolInputError(f"`tickers` must include at least one of: {', '.join(MARKET_TICKERS.keys())}")
+    unknown = [t for t in ticker_names if t not in MARKET_TICKERS]
+    if unknown:
+        raise ToolInputError(f"Unknown ticker(s): {', '.join(unknown)}. Valid values: {', '.join(MARKET_TICKERS.keys())}")
+
     metric = args.get("metric", "level")
     granularity = args.get("granularity") or ("month" if metric == "return_pct" else "day")
-    bars = fetch_daily_bars(ticker_code, args.get("start_date"), args.get("end_date"))
-    if not bars:
-        raise ToolInputError(f"No market data for {ticker_name} in that date range.")
-    result = resample(bars, granularity=granularity, metric=metric, series_name=ticker_name)
+
+    bars_by_ticker = {}
+    total_rows = 0
+    for name in ticker_names:
+        bars = fetch_daily_bars(MARKET_TICKERS[name]["code"], args.get("start_date"), args.get("end_date"))
+        if not bars:
+            raise ToolInputError(f"No market data for {name} in that date range.")
+        bars_by_ticker[name] = bars
+        total_rows += len(bars)
+
+    result = resample_multi(bars_by_ticker, granularity=granularity, metric=metric)
     return {
-        "row_count": len(bars),
+        "row_count": total_rows,
         "point_count": len(result["data"]),
         "series": result["series"],
         "data": result["data"],

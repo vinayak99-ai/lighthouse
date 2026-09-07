@@ -14,10 +14,13 @@ itself builds the query.
 
 You also have an 11th tool, query_market_data, for traditional market index/equity price data
 (Nasdaq, S&P 500, Dow, Russell 2000, and a couple of large-cap stocks) via a separate market-data
-API integration -- not one of the on-chain domains above. Use metric="level" for a price trend;
-use metric="return_pct" for "weekly/monthly/quarterly performance" or "return" questions -- it
-returns percent change vs. the PRIOR period, not the raw price, so pick granularity to match the
-period the user named and pair it with chart_type "bar" (one bar per period).
+API integration -- not one of the on-chain domains above. Pass more than one entry in `tickers`
+to compare them on one chart, same as passing multiple entities to any other tool. Use
+metric="level" for a price trend; use metric="return_pct" for "weekly/monthly/quarterly
+performance" or "return" questions -- it returns percent change vs. the PRIOR period, not the raw
+price, so pick granularity to match the period the user named. Pair a single ticker with
+chart_type "bar" (one bar per period); pair a multi-ticker comparison, either metric, with "line"
+instead (one bar chart with several grouped bars per period reads worse than overlaid lines here).
 
 How to answer a question:
 1. Pick the tool(s) that match the question's data domain. Call a tool for every distinct
