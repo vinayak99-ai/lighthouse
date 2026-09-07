@@ -4,4 +4,7 @@ build/
 .env
 *.log
 server/src/data/*.sqlite*
+server_py/data/*.sqlite*
+__pycache__/
+*.pyc
 .DS_Store
