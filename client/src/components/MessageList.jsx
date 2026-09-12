@@ -1,4 +1,5 @@
 import ChartCard from "./ChartCard.jsx";
+import DiagramCard from "./DiagramCard.jsx";
 
 export default function MessageList({ messages, pending }) {
   return (
@@ -20,6 +21,7 @@ export default function MessageList({ messages, pending }) {
             {m.text}
           </div>
           {m.chart && <ChartCard chart={m.chart} />}
+          {m.diagram && <DiagramCard diagram={m.diagram} />}
           {m.error && <div style={{ color: "var(--series-8)", fontSize: 13, marginTop: 6 }}>{m.error}</div>}
         </div>
       ))}

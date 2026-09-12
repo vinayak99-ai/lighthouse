@@ -6,7 +6,8 @@ because each SDK returns a genuinely different response shape; here every
 provider (Bedrock's own Converse API, or a corporate wrapper fronting
 OpenAI/Anthropic/Gemini-family models -- see chat/providers/) normalizes
 into the same LLMResponse at its own boundary, so the loop -- including
-the self-correcting render_chart retry -- exists exactly once.
+the self-correcting render_chart/render_diagram retries -- exists exactly
+once.
 """
 
 from __future__ import annotations
@@ -17,11 +18,14 @@ import os
 from .llm_client import LLMClient, LLMResponse
 from .providers.bedrock import CONVERSE_TOOLS
 from ..tools.chart_validator import validate_chart
+from ..tools.diagram_renderer import render_diagram_svg
+from ..tools.diagram_validator import validate_diagram
 from ..tools.system_prompt import build_system_prompt
 from ..tools.tools import ToolInputError, run_tool
 
 MAX_TURNS = 6
 MAX_CHART_CORRECTIONS = 2
+MAX_DIAGRAM_CORRECTIONS = 2
 
 
 def _resolve_provider() -> str | None:
@@ -89,8 +93,10 @@ def run_conversation(history: list[dict], client: LLMClient | None = None) -> di
 
     messages = _history_to_converse(history)
     chart: dict | None = None
+    diagram: dict | None = None
     reply_text = ""
     chart_corrections = 0
+    diagram_corrections = 0
 
     for _turn in range(MAX_TURNS):
         response: LLMResponse = client.create(system=build_system_prompt(), messages=messages, tools=CONVERSE_TOOLS)
@@ -129,6 +135,25 @@ def run_conversation(history: list[dict], client: LLMClient | None = None) -> di
                         )
                     )
                 continue
+            if tool_call.name == "render_diagram":
+                result = validate_diagram(tool_call.input)
+                # Same self-correcting pattern as render_chart above -- a
+                # failed layout never reaches the user, it goes back to the
+                # model as corrective feedback within the same turn.
+                if result["valid"] or diagram_corrections >= MAX_DIAGRAM_CORRECTIONS:
+                    diagram = {"title": tool_call.input.get("title"), "svg": render_diagram_svg(tool_call.input)}
+                    tool_result_blocks.append(_tool_result(tool_call.id, "Diagram rendered and shown to the user.", status="success"))
+                else:
+                    diagram_corrections += 1
+                    issues = "\n- ".join(result["issues"])
+                    tool_result_blocks.append(
+                        _tool_result(
+                            tool_call.id,
+                            f"This diagram won't render well:\n- {issues}\nCall render_diagram again with a fix.",
+                            status="error",
+                        )
+                    )
+                continue
             try:
                 tool_output = run_tool(tool_call.name, tool_call.input)
                 tool_result_blocks.append(_tool_result(tool_call.id, json.dumps(tool_output), status="success"))
@@ -139,7 +164,8 @@ def run_conversation(history: list[dict], client: LLMClient | None = None) -> di
 
         messages.append({"role": "user", "content": tool_result_blocks})
 
-        if chart:
+        if chart or diagram:
             break
 
-    return {"reply": reply_text or (chart.get("insight") if chart else None) or "Here's what I found.", "chart": chart}
+    fallback_reply = (chart.get("insight") if chart else None) or (diagram.get("title") if diagram else None)
+    return {"reply": reply_text or fallback_reply or "Here's what I found.", "chart": chart, "diagram": diagram}

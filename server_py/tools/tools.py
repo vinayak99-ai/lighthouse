@@ -347,6 +347,49 @@ TOOL_DEFINITIONS = [
             "required": ["chart_type", "title", "series", "data"],
         },
     },
+    {
+        "name": "render_diagram",
+        "description": (
+            "Render a CONCEPTUAL/STRUCTURAL diagram -- how something works, or how entities relate -- as opposed "
+            "to render_chart, which visualizes quantitative data. Use this for 'explain how X works' or 'show "
+            "the flow of Y' questions, never for a metric over time or across entities (that's always "
+            "render_chart). Only diagram_type 'flowchart' is available right now: nodes laid out top-to-bottom "
+            "by dependency order, connected by directional edges. You supply structure only (node ids, labels, "
+            "which node points to which) -- never coordinates or raw SVG; the backend lays it out deterministically."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "diagram_type": {"type": "string", "enum": ["flowchart"]},
+                "title": {"type": "string"},
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "description": "Short, unique identifier referenced by edges -- not shown to the user."},
+                            "label": {"type": "string", "description": "Text shown in the box. Keep it short (under ~30 characters) so it fits."},
+                        },
+                        "required": ["id", "label"],
+                    },
+                    "description": "Up to 12 nodes.",
+                },
+                "edges": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "from": {"type": "string", "description": "A node id."},
+                            "to": {"type": "string", "description": "A node id."},
+                            "label": {"type": "string", "description": "Optional short label on the connector, e.g. 'settles via'."},
+                        },
+                        "required": ["from", "to"],
+                    },
+                },
+            },
+            "required": ["diagram_type", "title", "nodes"],
+        },
+    },
 ]
 
 

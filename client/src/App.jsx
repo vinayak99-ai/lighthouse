@@ -23,7 +23,7 @@ export default function App() {
     try {
       const history = nextTurns.map((t) => ({ role: t.role, content: t.text }));
       const result = await sendChat(history);
-      setTurns((cur) => [...cur, { role: "assistant", text: result.reply, chart: result.chart }]);
+      setTurns((cur) => [...cur, { role: "assistant", text: result.reply, chart: result.chart, diagram: result.diagram }]);
     } catch (err) {
       setTurns((cur) => [...cur, { role: "assistant", text: "", error: err.message }]);
     } finally {

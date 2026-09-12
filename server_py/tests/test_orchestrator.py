@@ -1,5 +1,5 @@
 from ..chat.llm_client import LLMResponse, ToolCall
-from ..chat.orchestrator import MAX_CHART_CORRECTIONS, run_conversation
+from ..chat.orchestrator import MAX_CHART_CORRECTIONS, MAX_DIAGRAM_CORRECTIONS, run_conversation
 
 
 class _ScriptedClient:
@@ -99,4 +99,75 @@ def test_unknown_tool_name_surfaces_as_error_result_not_a_crash():
 def test_no_tool_calls_returns_plain_reply():
     client = _ScriptedClient([LLMResponse(text="Just an answer, no chart needed.", tool_calls=[])])
     result = run_conversation([{"role": "user", "content": "q"}], client=client)
-    assert result == {"reply": "Just an answer, no chart needed.", "chart": None}
+    assert result == {"reply": "Just an answer, no chart needed.", "chart": None, "diagram": None}
+
+
+def test_render_diagram_produces_a_diagram():
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                text="Here's how it works.",
+                tool_calls=[
+                    ToolCall(
+                        id="d1",
+                        name="render_diagram",
+                        input={
+                            "diagram_type": "flowchart",
+                            "title": "Flow",
+                            "nodes": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}],
+                            "edges": [{"from": "a", "to": "b"}],
+                        },
+                    )
+                ],
+            )
+        ]
+    )
+    result = run_conversation([{"role": "user", "content": "explain how it works"}], client=client)
+    assert result["reply"] == "Here's how it works."
+    assert result["chart"] is None
+    assert result["diagram"]["title"] == "Flow"
+    assert result["diagram"]["svg"].startswith("<svg")
+
+
+def test_invalid_diagram_self_corrects_within_the_same_turn():
+    client = _ScriptedClient(
+        [
+            LLMResponse(
+                text="",
+                tool_calls=[
+                    ToolCall(
+                        id="bad",
+                        name="render_diagram",
+                        input={"diagram_type": "flowchart", "title": "Bad", "nodes": [{"id": "a", "label": "A"}], "edges": [{"from": "a", "to": "ghost"}]},
+                    )
+                ],
+            ),
+            LLMResponse(
+                text="Fixed.",
+                tool_calls=[
+                    ToolCall(
+                        id="good",
+                        name="render_diagram",
+                        input={"diagram_type": "flowchart", "title": "Fixed", "nodes": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}], "edges": [{"from": "a", "to": "b"}]},
+                    )
+                ],
+            ),
+        ]
+    )
+    result = run_conversation([{"role": "user", "content": "q"}], client=client)
+    assert result["diagram"]["title"] == "Fixed"
+    assert "ghost" not in result["diagram"]["svg"]
+
+
+def test_gives_up_after_max_diagram_corrections_and_accepts_last_attempt():
+    bad_diagram = {"diagram_type": "flowchart", "title": "Bad", "nodes": [{"id": "a", "label": "A"}], "edges": [{"from": "a", "to": "ghost"}]}
+    responses = [
+        LLMResponse(text="", tool_calls=[ToolCall(id=f"d{i}", name="render_diagram", input=bad_diagram)])
+        for i in range(MAX_DIAGRAM_CORRECTIONS + 1)
+    ]
+    client = _ScriptedClient(responses)
+    result = run_conversation([{"role": "user", "content": "q"}], client=client)
+    # Same "user never sees a failure" contract as render_chart: past the
+    # retry budget, the last attempt is accepted rather than surfaced as an
+    # error -- even though the renderer will just drop the dangling edge.
+    assert result["diagram"]["title"] == "Bad"

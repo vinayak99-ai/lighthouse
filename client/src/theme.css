@@ -146,6 +146,17 @@ body {
   opacity: 0.4;
 }
 
+/* render_diagram's SVG carries its own intrinsic width/height (see
+   diagram_renderer.py) so it has a natural aspect ratio -- scale it down on
+   narrow viewports and cap its height so a tall multi-row flowchart can't
+   blow up the page the way an unconstrained SVG does by default. */
+.lh-diagram-card svg {
+  max-width: 100%;
+  max-height: 480px;
+  height: auto;
+  display: block;
+}
+
 /* Recharts' own class names, targeted directly for a glow Recharts has no prop for. */
 .recharts-active-dot {
   filter: drop-shadow(0 1px 4px rgba(11, 11, 11, 0.35));

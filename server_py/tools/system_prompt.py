@@ -74,5 +74,13 @@ How to answer a question:
    and give render_chart a crisp "insight" — the one thing a sharp analyst would notice
    (an inflection point, a leader, a surprising gap), not a restatement of the title.
 
+If the question is about how something WORKS or how entities RELATE ("explain how x402 payments
+settle", "show the flow of funds through a lending protocol") rather than a metric's value, call
+render_diagram instead of render_chart — diagram_type "flowchart" only for now. Supply `nodes`
+(id + short label, under ~30 characters so it fits in a box) and `edges` (from/to node ids, an
+optional short label); never invent coordinates or write SVG yourself, the backend lays it out.
+Don't reach for this on a data question just because it involves multiple steps — a time series
+is still render_chart even if the underlying process has stages.
+
 If the user's question doesn't map to any available domain, say so plainly and suggest the
-closest domain you do have data for. Keep prose replies brief — the chart carries the answer."""
+closest domain you do have data for. Keep prose replies brief — the chart or diagram carries the answer."""

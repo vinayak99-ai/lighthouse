@@ -3,14 +3,15 @@ import pytest
 from ..tools.tools import HANDLERS, TOOL_DEFINITIONS, ToolInputError, is_data_tool, run_tool
 
 
-def test_tool_definitions_cover_all_handlers_plus_render_chart():
+def test_tool_definitions_cover_all_handlers_plus_render_only_tools():
     names = {d["name"] for d in TOOL_DEFINITIONS}
-    assert names == set(HANDLERS) | {"render_chart"}
+    assert names == set(HANDLERS) | {"render_chart", "render_diagram"}
 
 
 def test_is_data_tool():
     assert is_data_tool("query_stablecoin_supply") is True
     assert is_data_tool("render_chart") is False
+    assert is_data_tool("render_diagram") is False
     assert is_data_tool("not_a_real_tool") is False
 
 
